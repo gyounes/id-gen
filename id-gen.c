@@ -32,6 +32,7 @@
 #define MIN(X, Y) (((X) < (Y)) ? (X) : (Y))
 #define N127 0x7f
 #define N128 0x80
+#define Compression 0
 
 typedef struct _ByteArray{
   size_t len; /**< Number of bytes in the `data` field. */
@@ -146,7 +147,7 @@ ByteArray incrementByteArray(ByteArray ba){
   return newba;
 }
 
-ByteArray ByteArray_GenerateBetweenX(ByteArray ba1, ByteArray ba2, int withCompression){
+ByteArray ByteArray_GenerateBetween(ByteArray ba1, ByteArray ba2, int withCompression){
   if(withCompression){
     if (!isTopVal(ba1))
       ba1 = decompress(ba1);
@@ -154,14 +155,12 @@ ByteArray ByteArray_GenerateBetweenX(ByteArray ba1, ByteArray ba2, int withCompr
       ba2 = decompress(ba2);
   }
   assert(lessThan(ba1, ba2));
-
   ByteArray res;
 
   for (int i = 0; i < ba1.len; ++i){
     uint8_t diff = ba2.data[i] - ba1.data[i];
-
     if (diff == 0){
-      if (ba1.len - i> i+1)
+      if (ba1.len > i+1)
         continue;
       else{
         if (ba2.data[i+1] == 0x01){
@@ -223,16 +222,11 @@ ByteArray ByteArray_GenerateBetweenX(ByteArray ba1, ByteArray ba2, int withCompr
       break;
     }
   }
-  // printByteArray(res);
   assert(lessThan(ba1, res));
   assert(lessThan(res, ba2));
   if(withCompression)
     res = compress(res);
   return res;
-}
-
-ByteArray ByteArray_GenerateBetween(ByteArray ba1, ByteArray ba2){
-  return ByteArray_GenerateBetweenX(ba1, ba2, 0);
 }
 
 int compare(ByteArray a, ByteArray b)
@@ -297,7 +291,7 @@ node * InsertAfter(node *pos)
 {
     node * next = pos->next;
     assert(next != NULL);
-    ByteArray ba = ByteArray_GenerateBetween(pos->ba, next->ba);
+    ByteArray ba = ByteArray_GenerateBetween(pos->ba, next->ba, Compression);
     node * newnode;
     newnode = (node *)malloc(sizeof(node));
     newnode->ba = ba;
@@ -309,7 +303,7 @@ node * InsertAfter(node *pos)
 
 void pushFront(node *head)
 {
-    ByteArray ba = ByteArray_GenerateBetween(head->ba, head->next->ba);
+    ByteArray ba = ByteArray_GenerateBetween(head->ba, head->next->ba, Compression);
     node * newnode;
     newnode = (node *)malloc(sizeof(node));
     newnode->ba = ba;
@@ -327,7 +321,7 @@ void pushBack(node *head)
         previous = last;
         last = last->next;
     }
-    ByteArray ba = ByteArray_GenerateBetweenX(previous->ba, last->ba, 1);
+    ByteArray ba = ByteArray_GenerateBetween(previous->ba, last->ba, Compression);
     node * newnode;
     newnode = (node *)malloc(sizeof(node));
     newnode->ba = ba;
@@ -366,13 +360,13 @@ void Traverse(node * head){
 }
 
 void printSeqSize(node * head){
-  int a[10]= {0,0,0,0,0,0,0,0,0,0};
+  int a[20]= {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
   node * current = head->next;
   while (current != NULL){
     a[current->ba.len-1]++;
     current = current->next;
   }
-  for (int i = 0; i < 10; ++i)
+  for (int i = 0; i < 20; ++i)
     printf("ids of size %d Byte(s): %d\n", i+1, a[i]);
 }
 
@@ -400,7 +394,7 @@ void testPushFront(){
 void testPushBack(){
   node* seq = createList();
   Traverse(seq);
-  for (int i = 0; i < 10000; ++i)
+  for (int i = 0; i < 100000; ++i)
     pushBack(seq);
   Traverse(seq);
   printSeqSize(seq);
@@ -420,19 +414,22 @@ void testInsertAfter(){
 
 void testGenerateBetween(){
   ByteArray ba1;
-  ba1.len = 2;
+  ba1.len = 3;
   ba1.data = malloc(ba1.len);
-  ba1.data[0] = 0x3e;
-  ba1.data[1] = 0x0e;
+  ba1.data[0] = 0x01;
+  ba1.data[1] = 0x41;
+  ba1.data[2] = 0x40;
   printByteArray(ba1);
 
   ByteArray ba2;
-  ba2.len = 1;
+  ba2.len = 3;
   ba2.data = malloc(ba2.len);
-  ba2.data[0] = 0x3f;
+  ba2.data[0] = 0x01;
+  ba2.data[1] = 0x41;
+  ba2.data[2] = 0x41;
   printByteArray(ba2);
 
-  ByteArray res = ByteArray_GenerateBetween(ba1,ba2);
+  ByteArray res = ByteArray_GenerateBetween(ba1,ba2, Compression);
   printByteArray(res);
 }
 
@@ -450,12 +447,72 @@ void testCompress(){
   printByteArray(decompress(compress(ba)));
 }
 
+ByteArray getByteArrayAt(node* head, int pos){
+  int ctr = 0;
+  while(ctr != pos){
+    if (head->next == NULL)
+      return head->ba;
+    else
+      head = head->next;
+    ctr++;
+  };
+  return head->ba;
+}
+
+node * insertAfterPos(node* head, int pos){
+  int ctr = 0;
+  node * after;
+  while(ctr != pos){
+    if (head->next == NULL)
+      break;
+    else
+      head = head->next;
+    ctr++;
+  };
+  after = head;
+  ByteArray ba = ByteArray_GenerateBetween(after->ba, after->next->ba, Compression);
+  node * newnode;
+  newnode = (node *)malloc(sizeof(node));
+  newnode->ba = ba;
+  newnode->next = after->next;
+  after->next = newnode;
+  return newnode;
+}
+
+int getSeqLen(node* head){
+  int len = 0;
+  while(head->next != NULL){
+    len++;
+    head = head->next;
+  };
+  return len-1;
+}
+
+void randomInsertTest(int max){
+  node *seq = createList(), *last = seq;
+  while(max > 0){
+    int r1 = 1;//rand() % 2;
+    if (r1 == 0){ // insert
+      int r2 = rand() % getSeqLen(seq);
+      last = insertAfterPos(seq, r2);
+      max--;
+    }
+    else { // append
+      last = InsertAfter(last);
+      max--;
+    }
+  };
+  //Traverse(seq);
+  printSeqSize(seq);
+}
+
 int main(int argc, char **argv) {
   // testCompress();
   // testDecompress();
   // testGenerateBetween();
   // testInsertAfter();
-  testPushBack();
+  // testPushBack();
   // testPushFront();
+  randomInsertTest(1000);
   return 0;
 }
