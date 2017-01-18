@@ -319,6 +319,19 @@ void insertArrayAt(Array *a, int pos) {
     printf("Position is out of bounds\n");
 }
 
+void deleteArrayAt(Array *a, int pos) {
+  if (pos <= a->used+1) {
+    // shift values left
+    for (int i = pos; i < a->size-1; ++i)
+      a->ba[i] = a->ba[i+1];
+    --a->size;
+    --a->used;
+    a->ba = realloc(a->ba, a->size * sizeof(ByteArray));
+  }
+  else
+    printf("Position is out of bounds\n");
+}
+
 void freeArray(Array *a) {
   free(a->ba);
   a->ba = NULL;
