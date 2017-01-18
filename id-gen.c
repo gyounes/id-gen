@@ -338,182 +338,32 @@ void freeArray(Array *a) {
   a->used = a->size = 0;
 }
 
-///// end of Seq as Growable Array
-
-///// Sequence implmented as Linked list (initial dummy implementation)
-
-/* linked list functions */
-int Delete(node *, ByteArray);
-void Traverse(node *);
-node * createList();
-
-node * createList()
-{
-   /* initializing list */
-    node *head, *tail;
-    head = (node *)malloc(sizeof(node));
-    tail = (node *)malloc(sizeof(node));
-
-    head->ba.len = 1;
-    head->ba.data = malloc(head->ba.len);
-    head->ba.data[0] = 0x00;
-    head->next = tail;
-
-    tail->ba.len = 1;
-    tail->ba.data = malloc(tail->ba.len);
-    tail->ba.data[0] = 0x80;
-    tail->next = NULL;
-    
-    return head;
-}
-
-node * InsertAfter(node *pos)
-{
-    node * next = pos->next;
-    assert(next != NULL);
-    ByteArray ba = ByteArray_GenerateBetween(pos->ba, next->ba, Compression);
-    node * newnode;
-    newnode = (node *)malloc(sizeof(node));
-    newnode->ba = ba;
-
-    pos->next = newnode;
-    newnode->next = next;
-    return newnode;
-}
-
-void pushFront(node *head)
-{
-    ByteArray ba = ByteArray_GenerateBetween(head->ba, head->next->ba, Compression);
-    node * newnode;
-    newnode = (node *)malloc(sizeof(node));
-    newnode->ba = ba;
-
-    newnode->next = head->next;
-    head->next = newnode;
-}
-
-void pushBack(node *head)
-{
-    node * previous = head;
-    node * last = head->next;
-    while (last->next != NULL)
-    {
-        previous = last;
-        last = last->next;
-    }
-    ByteArray ba = ByteArray_GenerateBetween(previous->ba, last->ba, Compression);
-    node * newnode;
-    newnode = (node *)malloc(sizeof(node));
-    newnode->ba = ba;
-
-    newnode->next = last;
-    previous->next = newnode;
-}
-
-int Delete(node *head, ByteArray ba)
-{
-    node * previous = head;
-    node * current = head->next;
-    while (current != NULL && !equalsTo(current->ba, ba))
-    {
-        previous = current;
-        current = current->next;
-    }
-    if (current != head && current != NULL) /* if list empty or data not found */
-    {
-        previous->next = current->next;
-        free(current);
-        return 0;
-    }
-    else
-        return 1;
-}
- 
-void Traverse(node * head){
-    node * current = head;
-    while (current != NULL){
-        //printf("%d ", current->ba);
-        printByteArray(current->ba);
-        current = current->next;
-    }
-    printf("\n");
-}
-
-void printSeqSize(node * head){
-  int a[20]= {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
-  node * current = head->next;
-  while (current != NULL){
-    a[current->ba.len-1]++;
-    current = current->next;
-  }
-  for (int i = 0; i < 20; ++i)
-    printf("ids of size %d Byte(s): %d\n", i+1, a[i]);
-}
-
-ByteArray getByteArrayAt(node* head, int pos){
-  int ctr = 0;
-  while(ctr != pos){
-    if (head->next == NULL)
-      return head->ba;
-    else
-      head = head->next;
-    ctr++;
-  };
-  return head->ba;
-}
-
-node * insertAfterPos(node* head, int pos){
-  int ctr = 0;
-  node * after;
-  while(ctr != pos){
-    if (head->next == NULL)
-      break;
-    else
-      head = head->next;
-    ctr++;
-  };
-  after = head;
-  ByteArray ba = ByteArray_GenerateBetween(after->ba, after->next->ba, Compression);
-  node * newnode;
-  newnode = (node *)malloc(sizeof(node));
-  newnode->ba = ba;
-  newnode->next = after->next;
-  after->next = newnode;
-  return newnode;
-}
-
-int getSeqLen(node* head){
-  int len = 0;
-  while(head->next != NULL){
-    len++;
-    head = head->next;
-  };
-  return len-1;
+void printArrayBytes(Array *a){
+  int size = 100;
+  int b[size];
+  for (int i = 0; i < size; ++i)
+    b[i] = 0;
+  for (int i = 0; i < a->used; ++i)
+    b[a[i].ba->len-1]++;
+  for (int i = 0; i < size; ++i)
+    printf("ids of size %d Byte(s): %d\n", i+1, b[i]);
 }
 
 void randomInsertTest(int max){
-  node *seq = createList(), *last = seq;
+  Array *a;
+  initArray(a, max);
   while(max > 0){
-    int r1 = rand() % 2;
-    if (r1 == 0){ // insert
-      int r2 = rand() % getSeqLen(seq);
-      last = insertAfterPos(seq, r2);
-      max--;
-    }
-    else { // append
-      int r3 = rand() % max;
-      while(r3 > 0){
-        last = InsertAfter(last);
-        max--;
-        r3--;
-      }
-    }
+    int pos = rand() % a->used;
+    int k = rand() % max;
+    //int k = 20;
+    for (int i = 0; i < k; ++i)
+      insertArrayAt(a, pos+i);
+    max = max-k;
   };
-  //Traverse(seq);
-  printSeqSize(seq);
+  printArrayBytes(a);
 }
 
-///// end of seq: linked list
+///// end of Seq as Growable Array
 
 ///// unit tests
 
@@ -527,36 +377,6 @@ void testDecompress(){
 
   printByteArray(ba);
   printByteArray(decompress(ba));
-}
-
-void testPushFront(){
-  node* seq = createList();
-  Traverse(seq);
-  for (int i = 0; i < 10; ++i)
-    pushFront(seq);
-  Traverse(seq);
-  printSeqSize(seq);
-}
-
-void testPushBack(){
-  node* seq = createList();
-  Traverse(seq);
-  for (int i = 0; i < 1000; ++i)
-    pushBack(seq);
-  Traverse(seq);
-  printSeqSize(seq);
-}
-
-void testInsertAfter(){
-  node* seq = createList();
-  Traverse(seq);
-  node * next = InsertAfter(seq);
-  for (int i = 0; i < 5; ++i){
-    pushFront(seq);
-    next = InsertAfter(next);
-  }
-  Traverse(seq);
-  printSeqSize(seq);
 }
 
 void testGenerateBetween(){
@@ -600,9 +420,6 @@ int main(int argc, char **argv) {
   // testCompress();
   // testDecompress();
   // testGenerateBetween();
-  // testInsertAfter();
-  // testPushBack();
-  // testPushFront();
   srand((unsigned int)time(NULL));
   rand();
   randomInsertTest(10000);
