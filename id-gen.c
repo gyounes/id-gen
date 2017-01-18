@@ -31,6 +31,7 @@
 #include <time.h>
 
 #define MIN(X, Y) (((X) < (Y)) ? (X) : (Y))
+#define MAX(X, Y) (((X) > (Y)) ? (X) : (Y))
 #define N127 0x7f
 #define N128 0x80
 #define Compression 1
@@ -294,8 +295,8 @@ ByteArray GenerateIdAt(Array *a, int pos) {
   else // not empty Array
     if (pos == 0) // insert in the begining
       return ByteArray_GenerateBetween(bal, a->ba[pos], Compression);
-    else if (pos == a->used-1) // insert in the end
-      return ByteArray_GenerateBetween(a->ba[pos], bar, Compression);
+    else if (pos == a->used) // insert in the end
+      return ByteArray_GenerateBetween(a->ba[pos-1], bar, Compression);
     else
       return ByteArray_GenerateBetween(a->ba[pos-1], a->ba[pos], Compression);
 }
@@ -303,24 +304,30 @@ ByteArray GenerateIdAt(Array *a, int pos) {
 void insertArrayAt(Array *a, int pos) {
   // a->used is the number of used entries, because a->ba[a->used++] updates a->used only *after* the array has been accessed.
   // Therefore a->used can go up to a->size 
-
   if (pos <= a->used+1) {
-    ByteArray element = GenerateIdAt(a, pos);
     if (a->used == a->size) {
       a->size *= 2;
       a->ba = realloc(a->ba, a->size * sizeof(ByteArray));
     }
     // shift values right
-    for (int i = a->used-1; i > pos; --i)
-      a->ba[i+1] = a->ba[i];
+    if (a->used > 0 || pos < a->used)
+      for (int i = a->used-1; i >= pos; --i)
+        a->ba[i+1] = a->ba[i];
+    ByteArray element = GenerateIdAt(a, pos);
     a->ba[pos] = element;
+    ++a->used;
   }
   else
     printf("Position is out of bounds\n");
 }
 
+void printArray(Array *a) {
+  for (int i = 0; i < a->used; ++i)
+    printByteArray(a->ba[i]);
+}
+
 void deleteArrayAt(Array *a, int pos) {
-  if (pos <= a->used+1) {
+  if (pos <= a->used) {
     // shift values left
     for (int i = pos; i < a->size-1; ++i)
       a->ba[i] = a->ba[i+1];
@@ -339,28 +346,32 @@ void freeArray(Array *a) {
 }
 
 void printArrayBytes(Array *a){
-  int size = 100;
+  int size = 10;
   int b[size];
   for (int i = 0; i < size; ++i)
     b[i] = 0;
   for (int i = 0; i < a->used; ++i)
-    b[a[i].ba->len-1]++;
+    b[a->ba[i].len-1]++;
   for (int i = 0; i < size; ++i)
     printf("ids of size %d Byte(s): %d\n", i+1, b[i]);
 }
 
 void randomInsertTest(int max){
-  Array *a;
-  initArray(a, max);
+  Array a;
+  initArray(&a, max);
   while(max > 0){
-    int pos = rand() % a->used;
-    int k = rand() % max;
-    //int k = 20;
-    for (int i = 0; i < k; ++i)
-      insertArrayAt(a, pos+i);
+    int pos = rand() % (a.used+1);
+    int k = MAX(rand() % max, 1);
+    // int k = 1;
+    printf("pos is: %d\n", pos);
+    printf("k is: %d\n", k);
+    for (int i = 0; i < MIN(k, max); ++i)
+      insertArrayAt(&a, pos+i);
     max = max-k;
   };
-  printArrayBytes(a);
+  printArray(&a);
+  printArrayBytes(&a);
+  freeArray(&a);
 }
 
 ///// end of Seq as Growable Array
@@ -422,6 +433,6 @@ int main(int argc, char **argv) {
   // testGenerateBetween();
   srand((unsigned int)time(NULL));
   rand();
-  randomInsertTest(10000);
+  randomInsertTest(1000);
   return 0;
 }
