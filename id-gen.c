@@ -28,16 +28,31 @@
 #include <string.h>
 #include <assert.h>
 #include <math.h>
+#include <time.h>
 
 #define MIN(X, Y) (((X) < (Y)) ? (X) : (Y))
 #define N127 0x7f
 #define N128 0x80
-#define Compression 0
+#define Compression 1
 
 typedef struct _ByteArray{
   size_t len; /**< Number of bytes in the `data` field. */
   uint8_t* data; /**< Pointer to an allocated array of data bytes. */
 } ByteArray;
+
+typedef struct {
+  ByteArray *ba;
+  size_t used;
+  size_t size;
+} Array;
+
+struct node {
+    ByteArray ba;
+    struct node *next;
+};
+typedef struct node node;
+
+///// ByteArray Functions
 
 void printByteArray(ByteArray ba){
   printf("Byte array is: ");
@@ -256,11 +271,63 @@ int equalsTo(ByteArray a, ByteArray b){
   return compare(a, b) == 0;
 }
 
-struct node {
-    ByteArray ba;
-    struct node *next;
-};
-typedef struct node node;
+///// end of ByteArray
+
+///// Sequence imlpemented as growable array
+
+void initArray(Array *a, size_t initialSize) {
+  a->ba = malloc(initialSize * sizeof(ByteArray));
+  a->used = 0;
+  a->size = initialSize;
+}
+
+ByteArray GenerateIdAt(Array *a, int pos) {
+  ByteArray bal, bar;
+  bal.len = 1;
+  bal.data = malloc(bal.len);
+  bal.data[0] = 0x01;
+  bar.len = 1;
+  bar.data = malloc(bar.len);
+  bar.data[0] = 0x80;
+  if (a->used == 0) // empty Array
+    return ByteArray_GenerateBetween(bal, bar, Compression);
+  else // not empty Array
+    if (pos == 0) // insert in the begining
+      return ByteArray_GenerateBetween(bal, a->ba[pos], Compression);
+    else if (pos == a->used-1) // insert in the end
+      return ByteArray_GenerateBetween(a->ba[pos], bar, Compression);
+    else
+      return ByteArray_GenerateBetween(a->ba[pos-1], a->ba[pos], Compression);
+}
+
+void insertArrayAt(Array *a, int pos) {
+  // a->used is the number of used entries, because a->ba[a->used++] updates a->used only *after* the array has been accessed.
+  // Therefore a->used can go up to a->size 
+
+  if (pos <= a->used+1) {
+    ByteArray element = GenerateIdAt(a, pos);
+    if (a->used == a->size) {
+      a->size *= 2;
+      a->ba = realloc(a->ba, a->size * sizeof(ByteArray));
+    }
+    // shift values right
+    for (int i = a->used-1; i > pos; --i)
+      a->ba[i+1] = a->ba[i];
+    a->ba[pos] = element;
+  }
+  else
+    printf("Position is out of bounds\n");
+}
+
+void freeArray(Array *a) {
+  free(a->ba);
+  a->ba = NULL;
+  a->used = a->size = 0;
+}
+
+///// end of Seq as Growable Array
+
+///// Sequence implmented as Linked list (initial dummy implementation)
 
 /* linked list functions */
 int Delete(node *, ByteArray);
@@ -370,6 +437,73 @@ void printSeqSize(node * head){
     printf("ids of size %d Byte(s): %d\n", i+1, a[i]);
 }
 
+ByteArray getByteArrayAt(node* head, int pos){
+  int ctr = 0;
+  while(ctr != pos){
+    if (head->next == NULL)
+      return head->ba;
+    else
+      head = head->next;
+    ctr++;
+  };
+  return head->ba;
+}
+
+node * insertAfterPos(node* head, int pos){
+  int ctr = 0;
+  node * after;
+  while(ctr != pos){
+    if (head->next == NULL)
+      break;
+    else
+      head = head->next;
+    ctr++;
+  };
+  after = head;
+  ByteArray ba = ByteArray_GenerateBetween(after->ba, after->next->ba, Compression);
+  node * newnode;
+  newnode = (node *)malloc(sizeof(node));
+  newnode->ba = ba;
+  newnode->next = after->next;
+  after->next = newnode;
+  return newnode;
+}
+
+int getSeqLen(node* head){
+  int len = 0;
+  while(head->next != NULL){
+    len++;
+    head = head->next;
+  };
+  return len-1;
+}
+
+void randomInsertTest(int max){
+  node *seq = createList(), *last = seq;
+  while(max > 0){
+    int r1 = rand() % 2;
+    if (r1 == 0){ // insert
+      int r2 = rand() % getSeqLen(seq);
+      last = insertAfterPos(seq, r2);
+      max--;
+    }
+    else { // append
+      int r3 = rand() % max;
+      while(r3 > 0){
+        last = InsertAfter(last);
+        max--;
+        r3--;
+      }
+    }
+  };
+  //Traverse(seq);
+  printSeqSize(seq);
+}
+
+///// end of seq: linked list
+
+///// unit tests
+
 void testDecompress(){
   ByteArray ba;
   ba.len = 3;
@@ -394,7 +528,7 @@ void testPushFront(){
 void testPushBack(){
   node* seq = createList();
   Traverse(seq);
-  for (int i = 0; i < 100000; ++i)
+  for (int i = 0; i < 1000; ++i)
     pushBack(seq);
   Traverse(seq);
   printSeqSize(seq);
@@ -447,64 +581,7 @@ void testCompress(){
   printByteArray(decompress(compress(ba)));
 }
 
-ByteArray getByteArrayAt(node* head, int pos){
-  int ctr = 0;
-  while(ctr != pos){
-    if (head->next == NULL)
-      return head->ba;
-    else
-      head = head->next;
-    ctr++;
-  };
-  return head->ba;
-}
-
-node * insertAfterPos(node* head, int pos){
-  int ctr = 0;
-  node * after;
-  while(ctr != pos){
-    if (head->next == NULL)
-      break;
-    else
-      head = head->next;
-    ctr++;
-  };
-  after = head;
-  ByteArray ba = ByteArray_GenerateBetween(after->ba, after->next->ba, Compression);
-  node * newnode;
-  newnode = (node *)malloc(sizeof(node));
-  newnode->ba = ba;
-  newnode->next = after->next;
-  after->next = newnode;
-  return newnode;
-}
-
-int getSeqLen(node* head){
-  int len = 0;
-  while(head->next != NULL){
-    len++;
-    head = head->next;
-  };
-  return len-1;
-}
-
-void randomInsertTest(int max){
-  node *seq = createList(), *last = seq;
-  while(max > 0){
-    int r1 = 1;//rand() % 2;
-    if (r1 == 0){ // insert
-      int r2 = rand() % getSeqLen(seq);
-      last = insertAfterPos(seq, r2);
-      max--;
-    }
-    else { // append
-      last = InsertAfter(last);
-      max--;
-    }
-  };
-  //Traverse(seq);
-  printSeqSize(seq);
-}
+///// end of unit tests
 
 int main(int argc, char **argv) {
   // testCompress();
@@ -513,6 +590,8 @@ int main(int argc, char **argv) {
   // testInsertAfter();
   // testPushBack();
   // testPushFront();
-  randomInsertTest(1000);
+  srand((unsigned int)time(NULL));
+  rand();
+  randomInsertTest(10000);
   return 0;
 }
