@@ -431,8 +431,31 @@ int main(int argc, char **argv) {
   // testCompress();
   // testDecompress();
   // testGenerateBetween();
-  srand((unsigned int)time(NULL));
-  rand();
-  randomInsertTest(1000);
+  // srand((unsigned int)time(NULL));
+  // rand();
+  // randomInsertTest(1000);
+
+  FILE *f = fopen("a", "w");
+  if (f == NULL)
+  {
+      printf("Error opening file!\n");
+      exit(1);
+  }
+
+  /* print some text */
+  const char *text = "Write this to the file";
+
+  fprintf(f, "%s,%s,%s\n", "Bytes","Random test","All appends");
+
+  /* print integers and floats */
+  fprintf(f, "%d,%d,%d\n", 1,23,121);
+  fprintf(f, "%d,%d,%d\n", 2,213,234);
+  fprintf(f, "%d,%d,%d\n", 3,124,176);
+  fprintf(f, "%d,%d,%d\n", 4,43,37);
+  fprintf(f, "%d,%d,%d\n", 5,12,5);
+  fprintf(f, "%d,%d,%d\n", 6,3,2);
+
+  fclose(f);
+
   return 0;
 }
