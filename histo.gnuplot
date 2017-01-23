@@ -25,14 +25,19 @@ set datafile missing '0'
 set datafile separator ","
 
 set style histogram clustered
+
+# read from one file multiple columns
 #stats inputfiles skip 1
 #max_col = STATS_columns
 #plot for [COL=2:max_col] inputfiles using COL:xticlabels(1) title columnheader
 
+# read from multiple files generate multiple graphs
+# do for [i=1:words(inputfiles)] {
+#  inputfile = word(inputfiles, i)
+#  stats inputfile skip 1
+#  max_col = STATS_columns
+#  plot for [COL=2:max_col] inputfile using COL:xticlabels(1) title columnheader w histogram ls i
+# }
 
-do for [i=1:words(inputfiles)] {
-  inputfile = word(inputfiles, i)
-  stats inputfile skip 1
-  max_col = STATS_columns
-  plot for [COL=2:max_col] inputfile using COL:xticlabels(1) title columnheader w histogram ls i
-}
+# read from multiple files generate single graph
+plot for [i=1:words(inputfiles)] word(inputfiles, i) using 2:xticlabels(1) title columnheader w histogram ls i
